@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.ensemble import RandomForestRegressor
+from keras.layers import SimpleRNN
 from sklearn.model_selection import train_test_split
 import pickle
 import glob
@@ -687,8 +688,8 @@ class lstm_new:
       model.add(LSTM(8,activation='relu')) 
       model.add(Dense(1))
       model.compile(optimizer=Adam(lr=0.001), loss='mse')
-      #early_stopping = EarlyStopping(monitor='val_loss', patience=3, verbose=1, restore_best_weights=True)
-      model.fit(x=X_train,y=y_train,validation_data=(X_test,y_test),batch_size=128,epochs=50)
+      early_stopping = EarlyStopping(monitor='val_loss', patience=3, verbose=1, restore_best_weights=True)
+      model.fit(x=X_train,y=y_train,validation_data=(X_test,y_test),batch_size=128,epochs=250,callbacks=[early_stopping])
       model.save(cwd_lstm+"\\models\\"+i+"\\")
       et = time.time()
       elapsed_time = et - st
@@ -873,6 +874,227 @@ class lstm_new:
     print('Execution time for metrics calculation is :', elapsed_time, 'seconds')
     logging.debug("metrics calculation completed sucessfully")
     print("METRICS CALCULATION COMPLETED SUCESSFULLY")
+class rnn_new:
+  global wavelet_level
+  global wavelet_type
+  global wavelet_mode 
+  def model_creation(self):
+    st = time.time()
+    global cwd_rnn
+    os.makedirs(cwd+"\\rnn\\", exist_ok=True)
+    cwd_rnn = cwd+"\\rnn\\"
+    print("RNN Model creation Started")
+    os.makedirs(cwd_rnn+"\\models", exist_ok=True)
+    logging.debug("files in train folder combined for modeling")
+    combined_csv = pd.read_csv(cwd+"\\combined_train_wavelet.csv", chunksize=50000)
+    combined_csv = pd.concat(combined_csv)
+    my_file = open(cwd+"\\input_signals.txt", "r")
+    lines = [line.strip() for line in my_file]
+    logging.debug("signals from input file are read successfully")
+    my_file1 = open(cwd+"\\output_signals.txt", "r")
+    lines1 = [line.strip() for line in my_file1]
+    logging.debug("signals from output file are read successfully")
+    inputs = lines
+    X = combined_csv[inputs].values
+    X = np.asarray(X)
+    outputs = lines1
+    for i in outputs:
+      os.makedirs(cwd_rnn+"\\models\\"+i+"\\", exist_ok=True)
+      y = combined_csv[i].values
+      y = np.asarray(y)
+      length = len(combined_csv)
+      in_len = len(inputs)
+      X = X.reshape(length, 1, in_len)
+      X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+      model = Sequential()
+      model.add(SimpleRNN(32, activation='relu', return_sequences=True, input_shape=(1, in_len)))
+      model.add(SimpleRNN(16, activation='relu', return_sequences=True))
+      model.add(SimpleRNN(8, activation='relu'))
+      model.add(Dense(1))
+      model.compile(optimizer=Adam(lr=0.001), loss='mse')
+      early_stopping = EarlyStopping(monitor='val_loss', patience=3, verbose=1, restore_best_weights=True)
+      model.fit(x=X_train, y=y_train, validation_data=(X_test, y_test), batch_size=128, epochs=2, callbacks=[early_stopping])
+      model.save(cwd_rnn+"\\models\\"+i+"\\")
+      et = time.time()
+      elapsed_time = et - st
+      print('Execution time for creating model is :', elapsed_time, 'seconds')
+      logging.debug("model saved successfully")
+      print("RNN MODEL SAVED SUCCESSFULLY")
+
+  def prediction(self):
+    st = time.time()
+    cwd_rnn = cwd+"\\rnn\\"
+    print("RNN PREDICTION STARTED...")
+    logging.debug("prediction started")
+    file_path = cwd+"\\test_wav\\"
+    t1 = glob.glob(file_path+"*.csv")
+    output = pd.DataFrame()
+    for file in t1:
+      filename = file.replace(file_path, "")
+      filename1 = filename.replace(".csv", "")
+      df = pd.read_csv(file)
+      logging.debug("signals from input file are read successfully for prediction")
+      my_file = open(cwd+"\\input_signals.txt", "r")
+      lines = [line.strip() for line in my_file]
+      my_file1 = open(cwd+"\\output_signals.txt", "r")
+      lines1 = [line.strip() for line in my_file1]
+      logging.debug("signals from output file are read successfully for prediction")
+      outputs = lines1
+      inputs = lines
+      length = len(df)
+      in_len = len(inputs)
+      for i in outputs:
+        my_model = keras.models.load_model(cwd_rnn+"\\models\\"+i+"\\")
+        os.makedirs(cwd_rnn+"\\predictions\\"+i+"\\", exist_ok=True)
+        row = df[inputs].values
+        row = row.reshape(length, 1, in_len)
+        logging.debug("trained model loaded successfully")
+        prediction = my_model.predict(row, verbose=0)
+        prediction = [item for sublist in prediction for item in sublist]
+        name = "output"+i
+        name = pd.DataFrame()
+        name['Sim_time'] = df['Sim_time']
+        name['predicted_signal'] = prediction
+        name['actual_signal'] = df[i]
+        name.to_csv(cwd_rnn+"\\predictions\\"+i+"\\"+filename1+".csv")
+      et = time.time()
+      elapsed_time = et - st
+      print('Execution time for prediction is :', elapsed_time, 'seconds')
+      logging.debug("prediction file saved successfully")
+      print("PREDICTION COMPLETED SUCCESSFULLY")
+
+  def idwt(self):
+    global time
+    cwd_rnn = cwd+"\\rnn\\"
+    st = time.time()
+    logging.debug("IDWT CONVERSION STARTED")
+    print("IDWT CONVERSION STARTED [RNN]...")
+    def get_csv_files(folder):
+      csv_files = []
+      for file in os.listdir(folder):
+          if file.endswith('.csv'):
+              csv_files.append(file)
+      return csv_files
+    my_file1 = open(cwd+"\\output_signals.txt", "r")
+    lines1 = [line.strip() for line in my_file1]
+    for i in lines1:
+      folder1_path = cwd_rnn+"predictions\\"+i+"\\"
+      print(folder1_path)
+      folder2_path = cwd+"\\test\\"
+      print(folder2_path)
+      new = pd.DataFrame()
+      wavelet_type = input("enter the wavelet type :")
+      wavelet_mode = input("enter the wavelet mode :")
+      wavelet_level = int(input("enter the level of wavelet :"))
+      os.makedirs(cwd_rnn+"predictions_idwt\\"+i, exist_ok=True)
+      files1 = get_csv_files(folder1_path)
+      files2 = get_csv_files(folder2_path)
+      for file1 in files1:
+        if file1 in files2:
+            file1_path = os.path.join(folder1_path, file1)
+            file2_path = os.path.join(folder2_path, file1)
+            with open(file1_path, 'r') as f1, open(file2_path, 'r') as f2:
+                pred = pd.read_csv(f1)
+                Time = pd.read_csv(f2)
+                actual = Time[i]
+                coeffs = pred['predicted_signal']
+                sim_time = Time['Sim_time']
+                sz = len(Time)
+                dummy_signal = [i for i in range(0, sz)]
+                coeffs_dummy = pywt.wavedec(dummy_signal, wavelet_type, wavelet_mode, wavelet_level)
+                coeff_slices = pywt.coeffs_to_array(coeffs_dummy)[1]
+                coeffs_idwt = pywt.array_to_coeffs(coeffs, coeff_slices, output_format='wavedec')
+                coeffs_idwt1 = pywt.waverec(coeffs_idwt, wavelet_type, wavelet_mode)
+                new = pd.DataFrame()
+                coeffs_idwt1 = coeffs_idwt1[0:sz]
+                new['actual_signal'] = actual
+                new['predicted_signal'] = coeffs_idwt1
+                new['Sim_time'] = sim_time
+                new.to_csv(cwd_rnn+'predictions_idwt\\'+i+'\\'+file1)
+      et = time.time()
+      elapsed_time = et - st
+      print('Execution time for IDWT conversion is :', elapsed_time, 'seconds')
+      logging.debug("IDWT conversion successful")
+      print("WAVELET TO TIME DOMAIN CONVERSION COMPLETED SUCCESSFULLY !!!!")
+
+  def graph_plot(self):
+      st = time.time()
+      cwd_rnn = os.path.join(cwd, "rnn")
+      print("Generating Graph Plot")
+      my_file1 = open(os.path.join(cwd, "output_signals.txt"), "r")
+      lines1 = [line.strip() for line in my_file1]
+      for i in lines1:
+          path = os.path.join(cwd_rnn, "predictions_idwt", i, "*.csv")
+          lpath = len(path) - 5
+          list_files = []
+          count = 0
+          os.makedirs(os.path.join(cwd_rnn, "graphs", i), exist_ok=True)
+          for file in glob.glob(path):
+              count += 1
+              name = file[lpath:-4]
+              list_files.append(name)
+              df_fun = pd.read_csv(file)
+              X_time = df_fun['Sim_time']
+              vinn = df_fun['actual_signal']
+              pred_vinn = df_fun['predicted_signal']
+              fig = plt.figure(figsize=(16, 9), facecolor='w', edgecolor='k')
+              plt.plot(X_time, vinn, color="blue", linewidth=3, label="Actual signal")
+              plt.plot(X_time, pred_vinn, color="red", linewidth=3, label="Predicted signal")
+              title = name
+              plt.xlabel("Time", fontsize=10)
+              plt.ylabel("vinn", fontsize=10)
+              plt.grid(True)
+              plt.legend(loc="lower right")
+              plt.title(title)
+              nm = os.path.join(cwd_rnn, "graphs", i, name + ".png")
+              plt.savefig(nm)
+      et = time.time()
+      elapsed_time = et - st
+      print('Execution time for graph plot is:', elapsed_time, 'seconds')
+      logging.debug("graph plotted successfully")
+      print("GRAPH PLOTTED SUCCESSFULLY")
+
+  def metrics(self):
+      st = time.time()
+      cwd_rnn = cwd+"\\rnn\\"
+      logging.debug("metrics calculation started")
+      print("METRICS CALCULATION STARTED...")
+      my_file1 = open(cwd+"\\output_signals.txt", "r")
+      lines1 = [line.strip() for line in my_file1]
+      for i in lines1:
+          file_path = cwd_rnn+"\\predictions_idwt\\"+i+"\\"
+          t1 = glob.glob(file_path+"*.csv")
+          result = pd.DataFrame(columns=['FILENAME', 'MAE', 'MSE', 'RMSE', 'R2SCORE', 'SNR'])
+          os.makedirs(cwd_rnn+"\\metrics\\"+i, exist_ok=True)
+          for file in t1:
+              filename = file.replace(file_path, "")
+              filename1 = filename.replace(".csv", "")
+              df = pd.read_csv(file)
+              df["diff"] = df["actual_signal"] - df["predicted_signal"]
+              length_of_rows = len(df)
+              n = length_of_rows - 1
+              upper = 0
+              lower = 0
+              upper = df['actual_signal'].pow(2).sum()
+              lower = df['diff'].pow(2).sum()
+              upper = upper/n
+              lower = lower/n
+              snr = 10*math.log10(upper/lower)
+              predvinn = df['predicted_signal']
+              vinn = df['actual_signal']
+              rmse = sqrt(mean_squared_error(predvinn, vinn))
+              mae = mean_absolute_error(predvinn, vinn)
+              mse = mean_squared_error(predvinn, vinn)
+              r2 = r2_score(predvinn, vinn)
+              result = pd.concat([result, pd.DataFrame({'FILENAME': [filename1], 'MAE': [mae], 'MSE': [mse], 'RMSE': [rmse], 'R2SCORE': [r2], 'SNR': [snr]})], ignore_index=True)
+              result_file = cwd_rnn+"\\metrics\\"+i+"\\metrics"+".csv"
+              result.to_csv(result_file, index=False)
+      et = time.time()
+      elapsed_time = et - st
+      print('Execution time for metrics calculation is :', elapsed_time, 'seconds')
+      logging.debug("metrics calculation completed successfully")
+      print("METRICS CALCULATION COMPLETED SUCCESSFULLY")
+
 if __name__ == "__main__":
   print('''   
                   __  __    _         _         _    _ _ _ _   _ _ _ _ _ 
@@ -886,8 +1108,9 @@ if __name__ == "__main__":
                  1. RANDOM FOREST MODELLING  \n
                  2. MULTI-LAYER PERCEPTRON MODELLING \n
                  3. LSTM MODELLING \n
-                 4. ALL ALGORITHMS MODELLING \n
-                 5. EXIT PROGRAM  \n ''')
+                 4. RNN  MODELLING \n
+                 5. ALL ALGORITHMS MODELLING \n
+                 6. EXIT PROGRAM  \n ''')
   choice = int(input("Select an option: "))
   rf= RandomForest()
   multi=MLP()
@@ -992,10 +1215,10 @@ if __name__ == "__main__":
     et_all= time.time()
     elapsed_time = et_all - st_all
     print('Complete Execution time for LSTM is :', elapsed_time, 'seconds')
-  elif choice== 4:
+  elif choice == 4:
     st_all=time.time()
     with open(cwd_mem+"usage.txt", "w") as f:
-      f.write("##ALL MODELLING STATS##")
+      f.write("##RNN MODELLING STATS##")
       f.write("###### RESOURCE USAGE STATS #######")
       f.write("\n")
       vcc=psutil.cpu_count()
@@ -1007,6 +1230,39 @@ if __name__ == "__main__":
       mem=mem/1024/1024/1024
       f.write(str(mem))
       f.write("\n")
+    print("RNN MODELLING SELECTED")
+    pr.specs("BEFORE ALL PROCESS-LSTM")
+    pr.dwt_train()
+    pr.dwt_test()
+    pr.combine_files()
+    pr.specs("AFTER COMBINING FILES-RNN")
+    pr.fetch()
+    rnn = rnn_new()
+    rnn.model_creation()
+    pr.specs("AFTER MODEL CREATION-LSTM")
+    rnn.prediction()
+    pr.specs("AFTER PREDICTION-RNN")
+    rnn.idwt()
+    rnn.graph_plot()
+    rnn.metrics()
+    et_all= time.time()
+    elapsed_time = et_all - st_all
+    print('Complete Execution time for LSTM is :', elapsed_time, 'seconds')  
+  elif choice == 5:
+    st_all = time.time()
+    with open(cwd_mem+"usage.txt", "w") as f:
+        f.write("##ALL MODELLING STATS##")
+        f.write("###### RESOURCE USAGE STATS #######")
+        f.write("\n")
+        vcc = psutil.cpu_count()
+        f.write('Total number of CPUs in server:')
+        f.write(str(vcc))
+        f.write("\n")
+        f.write("Total memory of server in Gbs:")
+        mem = psutil.virtual_memory()[0]
+        mem = mem/1024/1024/1024
+        f.write(str(mem))
+        f.write("\n")
     print("ALL ML MODELLING SELECTED")
     pr.dwt_train()
     pr.dwt_test()
@@ -1021,23 +1277,28 @@ if __name__ == "__main__":
     pr.specs("AFTER MODEL CREATION-NLP")
     lstm.model_creation()
     pr.specs("AFTER MODEL CREATION-LSTM")
+    rnn.model_creation()  # Assuming you have an instance of the rnn_new class named "rnn"
+    pr.specs("AFTER MODEL CREATION-RNN")
     rf.prediction()
     pr.specs("AFTER PREDICTION-RF")
     multi.prediction()
     pr.specs("AFTER PREDICTION-MLP")
     lstm.prediction()
     pr.specs("AFTER PREDICTION-LSTM")
+    rnn.prediction()  # Prediction using the RNN model
+    pr.specs("AFTER PREDICTION-RNN")
     rf.idwt()
     multi.idwt()
     lstm.idwt()
+    rnn.idwt()  # IDWT using the RNN model
     rf.graph_plot()
     multi.graph_plot()
     lstm.graph_plot()
+    rnn.graph_plot()  # Graph plot using the RNN model
     rf.metrics()
     multi.metrics()
     lstm.metrics()
-    et_all= time.time()
+    rnn.metrics()  # Metrics calculation using the RNN model
+    et_all = time.time()
     elapsed_time = et_all - st_all
-    print('Complete Execution time for LSTM is :', elapsed_time, 'seconds')
-  elif choice == 5:
-    sys.exit()
+    print('Complete Execution time for All Models is :', elapsed_time, 'seconds')
