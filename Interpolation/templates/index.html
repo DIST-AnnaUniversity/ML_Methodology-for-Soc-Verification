@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Learning Methodology for Automated Industrial SOC verification</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container d-flex justify-content-center align-items-center" style="height: 100vh;">
+        <div class="col-md-6">
+            <h1 class="display-8">Machine Learning Methodology for</h1>
+            <h1 class="display-8">Automated Industrial SOC verification</h1>
+            <!-- <h3>Upload Folders and Select Interpolation Technique</h3> -->
+            <form action="/upload" method="post" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="uniform_folder">Upload Uniform Folder:</label>
+                    <input type="file" class="form-control-file" id="uniform_folder" name="uniform_folder" required>
+                </div>
+                <div class="form-group">
+                    <label for="non_uniform_folder">Upload Non-Uniform Folder:</label>
+                    <input type="file" class="form-control-file" id="non_uniform_folder" name="non_uniform_folder" required>
+                </div>
+                <div class="form-group">
+                    <label for="interpolation_technique">Select Interpolation/Extrapolation Technique:</label>
+                    <select class="form-control" id="interpolation_technique" name="interpolation_technique" required>
+                        <option value="">----------------Select----------------</option>
+                        <option value="cubic">Cubic Spline Interpolation</option>
+                        <option value="linear">Linear Interpolation</option>
+                        <option value="barycentric">Barycentric Interpolation</option>
+                        <option value="nearest_neighbor">Nearest Neighbor Interpolation</option>
+                        <option value="quadratic">Quadratic Interpolation</option>
+                        <!-- Add more options if needed -->
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Submit</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS (Optional, only if you need JavaScript components) -->
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Interpolation Files and Select ML/DL Model</title>
+</head>
+<body>
+    <h1>Upload Interpolation Files and Select ML/DL Model</h1>
+    <form action="/result" method="POST" enctype="multipart/form-data">
+        <label for="interpolation_file">Upload Interpolation File:</label>
+        <input type="file" id="interpolation_file" name="interpolation_file"><br><br>
+        
+        <label for="model">Select ML/DL Model:</label>
+        <select id="model" name="model">
+            <option value="rnn">RNN</option>
+            <option value="lstm">LSTM</option>
+            <option value="mlp">MLP</option>
+            <option value="rf">Random Forest</option>
+        </select><br><br>
+        
+        <input type="submit" value="Enter">
+    </form>
+</body>
+</html>
